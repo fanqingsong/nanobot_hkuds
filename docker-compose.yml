@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  nanobot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nanobot:latest
+    container_name: nanobot
+    restart: unless-stopped
+    ports:
+      - "18790:18790"
+    volumes:
+      # Mount config directory for persistent configuration
+      - ${HOME}/.nanobot:/root/.nanobot
+      # Mount workspace for persistent data
+      - ./workspace:/app/workspace
+    environment:
+      - TZ=Asia/Shanghai
+    networks:
+      - nanobot-network
+
+networks:
+  nanobot-network:
+    driver: bridge
