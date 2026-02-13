@@ -12,7 +12,7 @@ from nanobot.bus.events import InboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.providers.base import LLMProvider
 from nanobot.agent.tools.registry import ToolRegistry
-from nanobot.agent.tools.filesystem import ReadFileTool, WriteFileTool, ListDirTool
+from nanobot.agent.tools.filesystem import ReadFileTool, WriteFileTool, EditFileTool, ListDirTool
 from nanobot.agent.tools.shell import ExecTool
 from nanobot.agent.tools.web import WebSearchTool, WebFetchTool
 
@@ -34,6 +34,7 @@ class SubagentManager:
         model: str | None = None,
         brave_api_key: str | None = None,
         exec_config: "ExecToolConfig | None" = None,
+        restrict_to_workspace: bool = False,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.provider = provider
@@ -42,6 +43,7 @@ class SubagentManager:
         self.model = model or provider.get_default_model()
         self.brave_api_key = brave_api_key
         self.exec_config = exec_config or ExecToolConfig()
+        self.restrict_to_workspace = restrict_to_workspace
         self._running_tasks: dict[str, asyncio.Task[None]] = {}
     
     async def spawn(
@@ -96,13 +98,15 @@ class SubagentManager:
         try:
             # Build subagent tools (no message tool, no spawn tool)
             tools = ToolRegistry()
-            tools.register(ReadFileTool())
-            tools.register(WriteFileTool())
-            tools.register(ListDirTool())
+            allowed_dir = self.workspace if self.restrict_to_workspace else None
+            tools.register(ReadFileTool(allowed_dir=allowed_dir))
+            tools.register(WriteFileTool(allowed_dir=allowed_dir))
+            tools.register(EditFileTool(allowed_dir=allowed_dir))
+            tools.register(ListDirTool(allowed_dir=allowed_dir))
             tools.register(ExecTool(
                 working_dir=str(self.workspace),
                 timeout=self.exec_config.timeout,
-                restrict_to_workspace=self.exec_config.restrict_to_workspace,
+                restrict_to_workspace=self.restrict_to_workspace,
             ))
             tools.register(WebSearchTool(api_key=self.brave_api_key))
             tools.register(WebFetchTool())
@@ -207,12 +211,17 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
     
     def _build_subagent_prompt(self, task: str) -> str:
         """Build a focused system prompt for the subagent."""
+        from datetime import datetime
+        import time as _time
+        now = datetime.now().strftime("%Y-%m-%d %H:%M (%A)")
+        tz = _time.strftime("%Z") or "UTC"
+
         return f"""# Subagent
 
-You are a subagent spawned by the main agent to complete a specific task.
+## Current Time
+{now} ({tz})
 
-## Your Task
-{task}
+You are a subagent spawned by the main agent to complete a specific task.
 
 ## Rules
 1. Stay focused - complete only the assigned task, nothing else
@@ -233,6 +242,7 @@ You are a subagent spawned by the main agent to complete a specific task.
 
 ## Workspace
 Your workspace is at: {self.workspace}
+Skills are available at: {self.workspace}/skills/ (read SKILL.md files as needed)
 
 When you have completed the task, provide a clear summary of your findings or actions."""
     
