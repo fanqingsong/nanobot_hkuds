@@ -4,6 +4,9 @@ x-common-config: &common-config
     dockerfile: Dockerfile
   volumes:
     - ~/.nanobot:/root/.nanobot
+    - ./workspace:/app/workspace
+  environment:
+    - TZ=Asia/Shanghai
 
 services:
   nanobot-gateway:
@@ -21,7 +24,9 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
-  
+    networks:
+      - nanobot-network
+
   nanobot-cli:
     <<: *common-config
     profiles:
@@ -29,3 +34,9 @@ services:
     command: ["status"]
     stdin_open: true
     tty: true
+    networks:
+      - nanobot-network
+
+networks:
+  nanobot-network:
+    driver: bridge

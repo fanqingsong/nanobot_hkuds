@@ -24,6 +24,33 @@ def _short_tool_id() -> str:
     return "".join(secrets.choice(_ALNUM) for _ in range(9))
 
 
+def _sanitize_utf8(s: str) -> str:
+    """Remove surrogate characters so the string is valid UTF-8 for API requests."""
+    if not s:
+        return s
+    return "".join(c for c in s if not (0xD800 <= ord(c) <= 0xDFFF))
+
+
+def _sanitize_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sanitize message contents to avoid UTF-8 surrogate encoding errors (e.g. from web/tool output)."""
+    out = []
+    for msg in messages:
+        m = dict(msg)
+        if "content" in m and m["content"]:
+            content = m["content"]
+            if isinstance(content, str):
+                m["content"] = _sanitize_utf8(content)
+            elif isinstance(content, list):
+                m["content"] = [
+                    {**part, "text": _sanitize_utf8(part.get("text", "") or "")}
+                    if isinstance(part.get("text"), str)
+                    else part
+                    for part in content
+                ]
+        out.append(m)
+    return out
+
+
 class LiteLLMProvider(LLMProvider):
     """
     LLM provider using LiteLLM for multi-provider support.

@@ -124,6 +124,7 @@ class ChannelManager:
                 channel = self.channels.get(msg.channel)
                 if channel:
                     try:
+                        logger.info(f"Dispatching outbound to channel={msg.channel} chat_id={msg.chat_id}")
                         await channel.send(msg)
                     except Exception as e:
                         logger.error("Error sending to {}: {}", msg.channel, e)

@@ -27,6 +27,7 @@ MSG_TYPE_MAP = {
     "audio": "[audio]",
     "file": "[file]",
     "sticker": "[sticker]",
+    "post": "",  # Rich text, extracted below
 }
 
 
@@ -883,7 +884,7 @@ class FeishuChannel(BaseChannel):
     def _on_message_sync(self, data: Any) -> None:
         """
         Sync handler for incoming messages (called from WebSocket thread).
-        Schedules async handling in the main event loop.
+        Schedules async handler on main loop.
         """
         if self._loop and self._loop.is_running():
             asyncio.run_coroutine_threadsafe(self._on_message(data), self._loop)
